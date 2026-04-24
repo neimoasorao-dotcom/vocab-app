@@ -1549,8 +1549,47 @@ let currentTimerTaskId = null;
 
 /* タイマー */
 let timerInterval = null;
-let timerSeconds  = 0;
 let timerRunning  = false;
+// ※ timerSeconds は廃止。経過秒は getElapsedSeconds() で随時計算する。
+
+/* ============================================================
+   タイマー永続化: ページを閉じても計測が続く仕組み
+   LocalStorage に { taskId, startedAt, accumulatedSeconds, running } を保存し、
+   再訪問時に Date.now() との差分で経過秒を復元する。
+============================================================ */
+const LS_TIMER = 'sf_timer_state';
+
+function getTimerState() {
+  try { const r = localStorage.getItem(LS_TIMER); return r ? JSON.parse(r) : null; }
+  catch { return null; }
+}
+function saveTimerState(state) {
+  if (state) localStorage.setItem(LS_TIMER, JSON.stringify(state));
+  else localStorage.removeItem(LS_TIMER);
+}
+/** 現在の経過秒を計算（実行中なら startedAt からの差分も加算） */
+function getElapsedSeconds() {
+  const state = getTimerState();
+  if (!state) return 0;
+  const base = state.accumulatedSeconds || 0;
+  if (state.running && state.startedAt) {
+    return base + Math.floor((Date.now() - state.startedAt) / 1000);
+  }
+  return base;
+}
+
+/* タブを離れるとき interval を止め、戻ったとき再起動する */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  } else {
+    const state = getTimerState();
+    if (state && state.running && !timerInterval) {
+      timerInterval = setInterval(updateTimerUI, 1000);
+      updateTimerUI();
+    }
+  }
+});
 
 /* Chart.js インスタンス保持 */
 const charts = {};
@@ -1786,6 +1825,16 @@ function renderScheduleList() {
    ③ タイマー
 ============================================================ */
 function renderTimerPage() {
+  /* ページを開いたとき、保存済みのタイマー状態を復元する */
+  const savedState = getTimerState();
+  if (savedState) {
+    currentTimerTaskId = savedState.taskId;
+    timerRunning = savedState.running;
+    if (savedState.running && !timerInterval) {
+      timerInterval = setInterval(updateTimerUI, 1000);
+    }
+  }
+
   const tasks = todayTasks().filter(t => !t.completed);
   const sel   = document.getElementById('timerTaskSelect');
   sel.innerHTML = '<option value="">タスクを選択してください</option>';
@@ -1797,6 +1846,21 @@ function renderTimerPage() {
     sel.appendChild(opt);
   });
   if (currentTimerTaskId) selectTimerTask();
+
+  /* ボタン表示を状態に合わせて復元 */
+  if (savedState && savedState.running) {
+    document.getElementById('btnStart').style.display = 'none';
+    document.getElementById('btnPause').style.display = '';
+    document.getElementById('btnEnd').style.display   = '';
+    document.getElementById('timerStateLabel').textContent = '勉強中';
+  } else if (savedState && !savedState.running && savedState.accumulatedSeconds > 0) {
+    document.getElementById('btnStart').style.display = '';
+    document.getElementById('btnStart').textContent   = '▶ 再開';
+    document.getElementById('btnPause').style.display = 'none';
+    document.getElementById('btnEnd').style.display   = '';
+    document.getElementById('timerStateLabel').textContent = '一時停止';
+  }
+
   updateTimerUI();
 }
 
@@ -1817,18 +1881,35 @@ function selectTimerTask() {
 
 function startTimer() {
   if (!currentTimerTaskId) { showToast('タスクを選んでください'); return; }
+  const existing = getTimerState();
+  const accumulated = existing ? (existing.accumulatedSeconds || 0) : 0;
+  /* 開始時刻をlocalStorageに保存 → ページを閉じても時刻は残る */
+  saveTimerState({
+    taskId: currentTimerTaskId,
+    startedAt: Date.now(),
+    accumulatedSeconds: accumulated,
+    running: true,
+  });
   timerRunning = true;
   document.getElementById('btnStart').style.display = 'none';
   document.getElementById('btnPause').style.display = '';
   document.getElementById('btnEnd').style.display   = '';
   document.getElementById('timerStateLabel').textContent = '勉強中';
-  timerInterval = setInterval(() => { timerSeconds++; updateTimerUI(); }, 1000);
+  timerInterval = setInterval(updateTimerUI, 1000);
 }
 
 function pauseTimer() {
   if (!timerRunning) return;
   timerRunning = false;
   clearInterval(timerInterval);
+  timerInterval = null;
+  /* 現在の経過秒を accumulated に保存して「ポーズ状態」として記録 */
+  saveTimerState({
+    taskId: currentTimerTaskId,
+    startedAt: null,
+    accumulatedSeconds: getElapsedSeconds(),
+    running: false,
+  });
   document.getElementById('timerStateLabel').textContent = '一時停止';
   document.getElementById('btnPause').style.display = 'none';
   document.getElementById('btnStart').style.display = '';
@@ -1836,20 +1917,23 @@ function pauseTimer() {
 }
 
 function endTimer() {
-  if (timerSeconds === 0) { showToast('まだ計測していません'); return; }
+  const elapsed = getElapsedSeconds();
+  if (elapsed === 0) { showToast('まだ計測していません'); return; }
   clearInterval(timerInterval);
+  timerInterval = null;
   timerRunning = false;
+  /* タイマー状態をlocalStorageから消去 */
+  saveTimerState(null);
   /* セッション記録 */
   const sessions = getSessions();
-  sessions.push({ date: today(), taskId: currentTimerTaskId, seconds: timerSeconds });
+  sessions.push({ date: today(), taskId: currentTimerTaskId, seconds: elapsed });
   saveSessions(sessions);
   /* タスクの実績更新 */
   const tasks = getTasks();
   const task  = tasks.find(t => t.id === currentTimerTaskId);
-  if (task) { task.actualTime = (task.actualTime || 0) + timerSeconds; saveTasks(tasks); }
-  showToast(`${Math.round(timerSeconds / 60)}分を記録しました`);
+  if (task) { task.actualTime = (task.actualTime || 0) + elapsed; saveTasks(tasks); }
+  showToast(`${Math.round(elapsed / 60)}分を記録しました`);
   /* リセット */
-  timerSeconds = 0;
   document.getElementById('btnStart').style.display = '';
   document.getElementById('btnStart').textContent   = '▶ 開始';
   document.getElementById('btnPause').style.display = 'none';
@@ -1860,14 +1944,15 @@ function endTimer() {
 }
 
 function updateTimerUI() {
-  const mm = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
-  const ss = String(timerSeconds % 60).padStart(2, '0');
+  const elapsed = getElapsedSeconds();
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
   document.getElementById('timerDisplay').textContent  = `${mm}:${ss}`;
-  document.getElementById('timerElapsed').textContent  = `経過 ${Math.round(timerSeconds/60)} 分`;
+  document.getElementById('timerElapsed').textContent  = `経過 ${Math.round(elapsed/60)} 分`;
   /* リング進捗 */
   const task  = currentTimerTaskId ? getTasks().find(t => t.id === currentTimerTaskId) : null;
   const total = task ? task.plannedTime * 60 : 1800;
-  const pct   = Math.min(timerSeconds / total, 1);
+  const pct   = Math.min(elapsed / total, 1);
   const circ  = 2 * Math.PI * 97; /* r=97 */
   document.getElementById('timerRing').style.strokeDashoffset = circ * (1 - pct);
 }
