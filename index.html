@@ -774,6 +774,111 @@ input, textarea, select { font-family: inherit; }
   font-weight: 400;
 }
 
+/* ---- タスク未選択時のヒント表示 ---- */
+.timer-free-hint {
+  font-size: .76rem;
+  color: var(--text-3);
+  text-align: center;
+  margin-top: -20px;
+  margin-bottom: 32px;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   ポストタイマー記録モーダル
+   タスク未選択でタイマー終了した際に表示する「何を勉強した？」入力UI
+============================================================ */
+.post-timer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.38);
+  z-index: 210;
+  align-items: flex-end;
+  justify-content: center;
+}
+.post-timer-overlay.open { display: flex; }
+
+.post-timer-box {
+  background: var(--surface);
+  border-radius: var(--r) var(--r) 0 0;
+  padding: 6px 20px 40px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  animation: slideUp .28s ease;
+}
+
+/* モーダルハンドル */
+.post-timer-handle {
+  width: 36px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 10px auto 18px;
+}
+
+/* 経過時間バッジ */
+.post-timer-elapsed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-2);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-bottom: 18px;
+}
+.post-timer-elapsed-badge .badge-icon { font-size: 1rem; }
+
+.post-timer-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-1);
+  margin-bottom: 4px;
+  letter-spacing: -.2px;
+}
+.post-timer-sub {
+  font-size: .83rem;
+  color: var(--text-2);
+  margin-bottom: 20px;
+  line-height: 1.55;
+}
+
+/* 教科グリッド（モーダル内コンパクト版） */
+.post-timer-subj-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+/* ボタン行 */
+.post-timer-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+.post-timer-btn-row .btn { flex: 1; }
+
+/* スキップリンク */
+.post-timer-skip {
+  display: block;
+  text-align: center;
+  font-size: .8rem;
+  color: var(--text-3);
+  margin-top: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: none;
+  border: none;
+  width: 100%;
+  padding: 4px;
+}
+
 /* ============================================================
    ④ 振り返り画面
 ============================================================ */
@@ -1054,7 +1159,7 @@ input, textarea, select { font-family: inherit; }
   }
 
   /* ---- 繰り越しボタン: ホームでは非表示（スペース節約） ---- */
-  #page-home > div[style*="margin-top:20px"] {
+  .home-carryover-wrap {
     display: none;
   }
 
@@ -1136,7 +1241,7 @@ input, textarea, select { font-family: inherit; }
   }
 
   /* スケジュールのタスク一覧ラベル */
-  #page-schedule > div[style*="margin-top:28px"] {
+  .schedule-list-wrap {
     margin-top: 16px !important;
   }
 
@@ -1159,6 +1264,20 @@ input, textarea, select { font-family: inherit; }
   .sp-hide-on-mobile { display: none !important; }
 
 } /* end @media (max-width: 600px) */
+
+/* ============================================================
+   ポストタイマーモーダル: スマホ追加調整
+============================================================ */
+@media (max-width: 600px) {
+  .post-timer-subj-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+  }
+  .post-timer-subj-grid .subject-btn {
+    padding: 8px 4px 7px;
+    font-size: .75rem;
+  }
+}
 
 /* ============================================================
    テンプレートタスク
@@ -1707,7 +1826,7 @@ input, textarea, select { font-family: inherit; }
         </div>
       </div>
 
-      <div style="margin-top:20px; text-align:center;">
+      <div class="home-carryover-wrap" style="margin-top:20px; text-align:center;">
         <button class="btn btn-secondary" onclick="carryOverTasks()" style="font-size:.82rem;">
           未完了タスクを翌日へ繰り越す
         </button>
@@ -1827,7 +1946,7 @@ input, textarea, select { font-family: inherit; }
         </button>
       </div>
 
-      <div style="margin-top:28px;">
+      <div class="schedule-list-wrap" style="margin-top:28px;">
         <div class="task-section-label" style="margin-bottom:8px;">本日のタスク</div>
         <div id="scheduleTaskList"></div>
       </div>
@@ -1848,11 +1967,15 @@ input, textarea, select { font-family: inherit; }
         </select>
 
         <select class="timer-select" id="timerTaskSelect" onchange="selectTimerTask()">
-          <option value="">タスクを選択してください</option>
+          <option value="">タスクなし（フリー学習）</option>
         </select>
+        <!-- タスク未選択時ヒント: フリー学習モードの説明 -->
+        <div class="timer-free-hint" id="timerFreeHint">
+          タスクを選ばずに開始できます。終了後に記録できます。
+        </div>
 
         <div class="timer-task-label" id="timerSubjectLabel"></div>
-        <div class="timer-task-name" id="timerTaskName">タスクを選択してください</div>
+        <div class="timer-task-name" id="timerTaskName">フリー学習</div>
 
         <div class="timer-ring-wrap">
           <svg class="timer-ring-svg" width="220" height="220" viewBox="0 0 220 220">
@@ -2162,6 +2285,50 @@ input, textarea, select { font-family: inherit; }
   </div>
 </div>
 
+<!-- ポストタイマー記録モーダル
+     タスク未選択のままタイマーを終了したときに表示。
+     何を勉強したかをここで入力してセッション記録に紐付ける。 -->
+<div class="post-timer-overlay" id="postTimerModal">
+  <div class="post-timer-box">
+    <div class="post-timer-handle"></div>
+
+    <!-- 経過時間バッジ -->
+    <div style="text-align:center;">
+      <div class="post-timer-elapsed-badge">
+        <span class="badge-icon">⏱</span>
+        <span id="postTimerElapsedLabel">0分</span>の学習お疲れ様！
+      </div>
+    </div>
+
+    <div class="post-timer-title">何を勉強しましたか？</div>
+    <div class="post-timer-sub">
+      記録しておくと分析に活用できます。<br>スキップして時間だけ記録することもできます。
+    </div>
+
+    <!-- 教科選択 -->
+    <div class="form-group" style="margin-bottom:12px;">
+      <label class="form-label">教科（任意）</label>
+      <div class="post-timer-subj-grid" id="postTimerSubjGrid"></div>
+    </div>
+
+    <!-- 学習内容 -->
+    <div class="form-group" style="margin-bottom:0;">
+      <label class="form-label">学習内容（任意）</label>
+      <input type="text" class="form-input" id="postTimerContent"
+        placeholder="例：英単語 Chapter 5、数学 微分練習" maxlength="80">
+    </div>
+
+    <!-- ボタン行 -->
+    <div class="post-timer-btn-row">
+      <button class="btn btn-primary" onclick="savePostTimerSession()">記録する</button>
+    </div>
+    <!-- スキップ: 時間だけ記録して教科・内容は残さない -->
+    <button class="post-timer-skip" onclick="skipPostTimerSession()">
+      スキップして時間だけ記録する
+    </button>
+  </div>
+</div>
+
 <!-- ============================================================
      JavaScript
 ============================================================ -->
@@ -2237,9 +2404,7 @@ document.addEventListener('touchstart', () => { try { getAudioCtx().resume(); } 
    アプリ状態
 ============================================================ */
 let currentPage        = 'home';
-let selectedSubj       = '';
-let plannedTime        = 30;
-let selectedPrio       = 'mid';
+const formState        = { subj: '', time: 30, prio: 'mid' };
 let achieveVal         = '';
 let focusVal           = 0;
 let reviewTaskId       = null;
@@ -2247,9 +2412,7 @@ let deleteTargetId     = null;
 let currentTimerTaskId = null;
 
 /* テンプレート用フォーム状態 */
-let tplSubj = '';
-let tplPlannedTime = 30;
-let tplPrio = 'mid';
+const tplState = { subj: '', time: 30, prio: 'mid' };
 
 /* タイマー */
 let timerInterval = null;
@@ -2278,8 +2441,15 @@ function getTimerState() {
   catch { return null; }
 }
 function saveTimerState(state) {
-  if (state) localStorage.setItem(LS_TIMER, JSON.stringify(state));
-  else        localStorage.removeItem(LS_TIMER);
+  if (state) {
+    try {
+      localStorage.setItem(LS_TIMER, JSON.stringify(state));
+    } catch(e) {
+      showToast('ストレージが満杯です。古いデータを削除してください。');
+    }
+  } else {
+    localStorage.removeItem(LS_TIMER);
+  }
 }
 /** 現在の経過秒を計算（実行中なら startedAt からの差分も加算） */
 function getElapsedSeconds() {
@@ -2340,7 +2510,13 @@ function load(key, def = []) {
   try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : def; }
   catch { return def; }
 }
-function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+function save(key, val) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch(e) {
+    showToast('ストレージが満杯です。古いデータを削除してください。');
+  }
+}
 
 function getTasks()      { return load(LS_KEYS.tasks); }
 function saveTasks(v)    { save(LS_KEYS.tasks, v); }
@@ -2467,16 +2643,21 @@ function calcTodayStudyMin() {
 }
 
 function calcStreak() {
-  const tasks = getTasks();
+  /* 完了済みタスクの日付 + セッションが存在する日付 の両方を活性日として扱う。
+     フリー学習（taskId=null）でも勉強した日はストリークに加算する。 */
+  const activeDays = new Set([
+    ...getTasks().filter(t => t.completed).map(t => t.date),
+    ...getSessions().map(s => s.date),
+  ]);
   let streak = 0;
   for (let i = 0; i < 365; i++) {
-    // JST基準で i 日前の日付を求める
     const dt = new Date(Date.now() - i * 86400000)
                  .toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' });
-    const dayTasks = tasks.filter(t => t.date === dt);
-    if (i > 0 && dayTasks.length === 0) break;
-    if (dayTasks.some(t => t.completed)) streak++;
-    else if (i > 0) break;
+    if (activeDays.has(dt)) {
+      streak++;
+    } else if (i > 0) {
+      break;
+    }
   }
   return streak;
 }
@@ -2568,45 +2749,45 @@ function renderSchedulePage() {
   renderTplList();
   renderTplSubjectGrid();
   updateTplPrioBtns();
-  document.getElementById('tplTimeDisp').textContent = tplPlannedTime;
+  document.getElementById('tplTimeDisp').textContent = tplState.time;
 
   document.getElementById('subjectGrid').innerHTML = getSubjects().map(s => `
-    <button class="subject-btn ${selectedSubj === s.name ? 'selected' : ''}"
+    <button class="subject-btn ${formState.subj === s.name ? 'selected' : ''}"
       onclick="selectSubject('${s.name}')">
       <span class="subj-icon">${s.emoji}</span>${s.name}
     </button>`).join('');
-  document.getElementById('plannedTimeDisp').textContent = plannedTime;
+  document.getElementById('plannedTimeDisp').textContent = formState.time;
   updatePriorityBtns();
   renderScheduleList();
 }
 
-function selectSubject(name) { selectedSubj = name; renderSchedulePage(); }
+function selectSubject(name) { formState.subj = name; renderSchedulePage(); }
 function adjustTime(d) {
-  plannedTime = Math.max(5, Math.min(300, plannedTime + d));
-  document.getElementById('plannedTimeDisp').textContent = plannedTime;
+  formState.time = Math.max(5, Math.min(300, formState.time + d));
+  document.getElementById('plannedTimeDisp').textContent = formState.time;
 }
-function selectPriority(p) { selectedPrio = p; updatePriorityBtns(); }
+function selectPriority(p) { formState.prio = p; updatePriorityBtns(); }
 function updatePriorityBtns() {
   document.querySelectorAll('.priority-btn').forEach(b => {
-    b.className = 'priority-btn' + (b.dataset.prio === selectedPrio ? ` sel-${selectedPrio}` : '');
+    b.className = 'priority-btn' + (b.dataset.prio === formState.prio ? ` sel-${formState.prio}` : '');
   });
 }
 
 function addTask() {
   const content = document.getElementById('taskContent').value.trim();
-  if (!selectedSubj) { showToast('教科を選んでください'); return; }
-  if (!content)      { showToast('内容を入力してください'); return; }
+  if (!formState.subj) { showToast('教科を選んでください'); return; }
+  if (!content)        { showToast('内容を入力してください'); return; }
   const tasks = getTasks();
   tasks.push({
-    id: genId(), date: today(), subject: selectedSubj, task: content,
-    plannedTime, actualTime: 0, focus: 0, completed: false,
-    achievement: '', failureReason: [], memo: '', priority: selectedPrio,
+    id: genId(), date: today(), subject: formState.subj, task: content,
+    plannedTime: formState.time, actualTime: 0, focus: 0, completed: false,
+    achievement: '', failureReason: [], memo: '', priority: formState.prio,
   });
   saveTasks(tasks);
   document.getElementById('taskContent').value = '';
-  selectedSubj = '';
-  plannedTime  = 30;
-  selectedPrio = 'mid';
+  formState.subj = '';
+  formState.time = 30;
+  formState.prio = 'mid';
   showToast('タスクを追加しました');
   renderSchedulePage();
 }
@@ -2650,9 +2831,9 @@ function renderTimerPage() {
   const incompleteTasks = todayTasks().filter(t => !t.completed);
   const allTasks        = todayTasks();
 
-  /* タイマー用セレクト */
+  /* タイマー用セレクト（先頭に「タスクなし」を用意） */
   const sel = document.getElementById('timerTaskSelect');
-  sel.innerHTML = '<option value="">タスクを選択してください</option>';
+  sel.innerHTML = '<option value="">タスクなし（フリー学習）</option>';
   incompleteTasks.forEach(t => {
     const opt = document.createElement('option');
     opt.value = t.id;
@@ -2671,7 +2852,8 @@ function renderTimerPage() {
     mSel.appendChild(opt);
   });
 
-  if (currentTimerTaskId) selectTimerTask();
+  /* タスク選択状態・ヒント表示を初期化 */
+  selectTimerTask();
 
   /* ボタン表示を状態に合わせて復元 */
   if (savedState && savedState.running) {
@@ -2694,11 +2876,19 @@ function renderTimerPage() {
 function selectTimerTask() {
   const id = document.getElementById('timerTaskSelect').value;
   currentTimerTaskId = id || null;
+
+  const hint = document.getElementById('timerFreeHint');
+
   if (!id) {
+    /* タスク未選択: フリー学習モード */
     document.getElementById('timerSubjectLabel').textContent = '';
-    document.getElementById('timerTaskName').textContent    = 'タスクを選択してください';
+    document.getElementById('timerTaskName').textContent    = 'フリー学習';
+    if (hint) hint.style.display = '';
     return;
   }
+
+  /* タスク選択済み: 従来の表示 */
+  if (hint) hint.style.display = 'none';
   const task = getTasks().find(t => t.id === id);
   if (!task) return;
   const subj = subjectByName(task.subject);
@@ -2707,7 +2897,7 @@ function selectTimerTask() {
 }
 
 function startTimer() {
-  if (!currentTimerTaskId) { showToast('タスクを選んでください'); return; }
+  /* タスク未選択でもフリー学習として開始できる（taskId = null） */
   const existing    = getTimerState();
   const accumulated = existing ? (existing.accumulatedSeconds || 0) : 0;
   /* B-1: ポモドーロ用に pomoPhaseStartSec をリセット（新規開始時のみ） */
@@ -2767,21 +2957,14 @@ function endTimer() {
   /* B-3: フリーモード終了音 */
   if (pomoMode === 'free') playBeep();
 
-  /* B-1: ポモドーロ・集中モードの場合、経過秒をそのままセッション記録 */
   /* タイマー状態を localStorage から消去 */
   saveTimerState(null);
-  /* セッション記録 */
-  const sessions = getSessions();
-  sessions.push({ date: today(), taskId: currentTimerTaskId, seconds: elapsed });
-  saveSessions(sessions);
-  /* タスクの実績更新 */
-  const tasks = getTasks();
-  const task  = tasks.find(t => t.id === currentTimerTaskId);
-  if (task) { task.actualTime = (task.actualTime || 0) + elapsed; saveTasks(tasks); }
+
   /* ポモドーロ状態リセット */
   pomoPhase        = 'work';
   pomoSessionCount = 0;
   _pomoPhaseStartSec = 0;
+
   /* UI リセット */
   document.getElementById('btnStart').style.display = '';
   document.getElementById('btnStart').textContent   = '▶ 開始';
@@ -2790,11 +2973,144 @@ function endTimer() {
   document.getElementById('timerStateLabel').textContent = '待機中';
   updateTimerUI();
   updateFabState();
-  /* 振り返り画面へ自動遷移 */
-  reviewTaskId = currentTimerTaskId;
-  showPage('review');
-  showToast('お疲れ様！振り返りを記録しよう');
+
+  if (currentTimerTaskId) {
+    /* ─── タスクあり: 従来通りセッション保存 → 振り返りへ ─── */
+    const sessions = getSessions();
+    sessions.push({ date: today(), taskId: currentTimerTaskId, seconds: elapsed });
+    saveSessions(sessions);
+    /* タスクの実績時間を更新 */
+    const tasks = getTasks();
+    const task  = tasks.find(t => t.id === currentTimerTaskId);
+    if (task) { task.actualTime = (task.actualTime || 0) + elapsed; saveTasks(tasks); }
+    reviewTaskId = currentTimerTaskId;
+    showPage('review');
+    showToast('お疲れ様！振り返りを記録しよう');
+  } else {
+    /* ─── タスクなし（フリー学習）: ポストタイマーモーダルを表示 ─── */
+    openPostTimerModal(elapsed);
+  }
 }
+
+/* ============================================================
+   ポストタイマー記録モーダル
+   タスク未選択のままタイマーを終了したときに、
+   「何を勉強したか」を入力してセッションを記録するUI。
+============================================================ */
+
+/**
+ * モーダルを開く。
+ * @param {number} elapsed - 経過秒数
+ */
+function openPostTimerModal(elapsed) {
+  /* 経過時間ラベルを設定 */
+  const min = Math.round(elapsed / 60);
+  document.getElementById('postTimerElapsedLabel').textContent = `${min}分`;
+
+  /* 教科グリッドを描画 */
+  const grid = document.getElementById('postTimerSubjGrid');
+  if (grid) {
+    /* モーダル専用の選択状態はグローバルで管理 */
+    _postTimerSelectedSubj = '';
+    grid.innerHTML = getSubjects().map(s => `
+      <button class="subject-btn"
+        data-ptsubj="${escHtml(s.name)}"
+        onclick="selectPostTimerSubj('${escHtml(s.name)}', this)">
+        <span class="subj-icon">${s.emoji}</span>${escHtml(s.name)}
+      </button>`).join('');
+  }
+
+  /* テキスト入力をリセット */
+  const inp = document.getElementById('postTimerContent');
+  if (inp) inp.value = '';
+
+  /* 経過秒をグローバルに保持（save/skip で参照） */
+  _postTimerElapsed = elapsed;
+
+  /* モーダルを表示 */
+  document.getElementById('postTimerModal').classList.add('open');
+}
+
+/** モーダル内の教科ボタンを選択 */
+function selectPostTimerSubj(name, btn) {
+  _postTimerSelectedSubj = name;
+  document.querySelectorAll('#postTimerSubjGrid .subject-btn').forEach(b =>
+    b.classList.toggle('selected', b === btn));
+}
+
+/**
+ * 「記録する」: 教科・内容からタスクを生成しセッションを保存する。
+ * 教科・内容どちらも任意。未入力時はデフォルト値を使用。
+ */
+function savePostTimerSession() {
+  const elapsed  = _postTimerElapsed || 0;
+  const subjName = _postTimerSelectedSubj || 'その他';
+  const content  = (document.getElementById('postTimerContent').value || '').trim()
+                   || 'フリー学習';
+
+  /* タスクを生成（completed = true, actualTime = 経過秒） */
+  const tasks = getTasks();
+  const newTask = {
+    id:            genId(),
+    date:          today(),
+    subject:       subjName,
+    task:          content,
+    plannedTime:   Math.max(1, Math.round(elapsed / 60)),
+    actualTime:    elapsed,
+    focus:         0,
+    completed:     true,   /* すでに学習済みなので完了扱い */
+    achievement:   '',
+    failureReason: [],
+    memo:          '',
+    priority:      'mid',
+    freeStudy:     true,   /* フリー学習フラグ（表示などで区別可能） */
+  };
+  tasks.push(newTask);
+  saveTasks(tasks);
+
+  /* セッションをタスクIDで保存 */
+  const sessions = getSessions();
+  sessions.push({ date: today(), taskId: newTask.id, seconds: elapsed });
+  saveSessions(sessions);
+
+  closePostTimerModal();
+  showToast('学習を記録しました！');
+
+  /* 振り返り画面へ遷移して、作成したタスクを選択状態にする */
+  reviewTaskId = newTask.id;
+  showPage('review');
+}
+
+/**
+ * 「スキップして時間だけ記録する」:
+ * タスクを作成せず、taskId=null のセッションのみ保存する。
+ * 分析の勉強時間合計には反映されるが、教科グラフは「その他」に集計される。
+ */
+function skipPostTimerSession() {
+  const elapsed = _postTimerElapsed || 0;
+  const sessions = getSessions();
+  /* freeStudy フラグを付けることで日別詳細パネルで「フリー学習」と表示 */
+  sessions.push({ date: today(), taskId: null, seconds: elapsed, freeStudy: true });
+  saveSessions(sessions);
+  closePostTimerModal();
+  showToast(`${Math.round(elapsed / 60)}分の学習を記録しました`);
+}
+
+/** モーダルを閉じる */
+function closePostTimerModal() {
+  document.getElementById('postTimerModal').classList.remove('open');
+  _postTimerElapsed      = 0;
+  _postTimerSelectedSubj = '';
+}
+
+/* ポストタイマーモーダルのグローバル状態 */
+let _postTimerElapsed      = 0;
+let _postTimerSelectedSubj = '';
+
+/* オーバーレイ外クリックで閉じる */
+document.getElementById('postTimerModal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closePostTimerModal();
+});
 
 function updateTimerUI() {
   const elapsed = getElapsedSeconds();
@@ -2923,24 +3239,24 @@ function renderTplList() {
 
 function renderTplSubjectGrid() {
   document.getElementById('tplSubjectGrid').innerHTML = getSubjects().map(s => `
-    <button class="subject-btn ${tplSubj === s.name ? 'selected' : ''}"
+    <button class="subject-btn ${tplState.subj === s.name ? 'selected' : ''}"
       onclick="selectTplSubj('${s.name}')">
       <span class="subj-icon">${s.emoji}</span>${s.name}
     </button>`).join('');
 }
 
-function selectTplSubj(name) { tplSubj = name; renderTplSubjectGrid(); }
+function selectTplSubj(name) { tplState.subj = name; renderTplSubjectGrid(); }
 function adjustTplTime(d) {
-  tplPlannedTime = Math.max(5, Math.min(300, tplPlannedTime + d));
-  document.getElementById('tplTimeDisp').textContent = tplPlannedTime;
+  tplState.time = Math.max(5, Math.min(300, tplState.time + d));
+  document.getElementById('tplTimeDisp').textContent = tplState.time;
 }
 function selectTplPrio(p) {
-  tplPrio = p;
+  tplState.prio = p;
   updateTplPrioBtns();
 }
 function updateTplPrioBtns() {
   document.querySelectorAll('[data-tplprio]').forEach(btn => {
-    btn.className = 'priority-btn' + (btn.dataset.tplprio === tplPrio ? ` sel-${tplPrio}` : '');
+    btn.className = 'priority-btn' + (btn.dataset.tplprio === tplState.prio ? ` sel-${tplState.prio}` : '');
   });
 }
 
@@ -2953,20 +3269,20 @@ function toggleTplForm() {
 }
 
 function saveTemplate() {
-  if (!tplSubj) { showToast('教科を選んでください'); return; }
+  if (!tplState.subj) { showToast('教科を選んでください'); return; }
   const content = document.getElementById('tplContent').value.trim();
   if (!content)  { showToast('学習内容を入力してください'); return; }
   const templates = getTemplates();
   templates.push({
     id: genId(),
-    subject: tplSubj,
+    subject: tplState.subj,
     task: content,
-    plannedTime: tplPlannedTime,
-    priority: tplPrio,
+    plannedTime: tplState.time,
+    priority: tplState.prio,
   });
   saveTemplates(templates);
   /* フォームリセット */
-  tplSubj = ''; tplPlannedTime = 30; tplPrio = 'mid';
+  tplState.subj = ''; tplState.time = 30; tplState.prio = 'mid';
   document.getElementById('tplContent').value = '';
   toggleTplForm();
   showToast('テンプレートを保存しました');
@@ -3381,7 +3697,8 @@ function renderChartSubject() {
   const subjectSec = {};
   getSessions().filter(s=>s.date===today()).forEach(s => {
     const t    = tasks.find(t=>t.id===s.taskId);
-    const subj = t ? t.subject : 'その他';
+    /* taskId=null（フリー学習スキップ）は「フリー学習」として集計 */
+    const subj = t ? t.subject : 'フリー学習';
     subjectSec[subj] = (subjectSec[subj]||0) + s.seconds;
   });
   const labels = Object.keys(subjectSec);
@@ -3578,9 +3895,13 @@ function openDayDetail(dateStr) {
   } else {
     sessEl.innerHTML = sessions.map(s => {
       const task = tasks.find(t => t.id === s.taskId);
-      const name = task ? `${task.subject} · ${task.task}` : '（タスク不明）';
+      /* taskId が null の場合はフリー学習セッション */
+      const name = task
+        ? `${task.subject} · ${task.task}`
+        : s.freeStudy ? 'フリー学習' : '（タスク不明）';
       const min  = Math.round((s.seconds || 0) / 60);
-      const tag  = s.manual ? ' <span style="font-size:.68rem;color:var(--text-3);">[手動]</span>' : '';
+      const tag  = s.manual    ? ' <span style="font-size:.68rem;color:var(--text-3);">[手動]</span>'     : ''
+                 + (s.freeStudy && !task ? ' <span style="font-size:.68rem;color:var(--text-3);">[フリー]</span>' : '');
       return `<div class="day-detail-session">
         <span class="sess-task">${escHtml(name)}${tag}</span>
         <span class="sess-time">${min}分</span>
